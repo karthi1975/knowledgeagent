@@ -21,15 +21,14 @@ if not anthropic_api_key and not openai_api_key:
     st.stop()
 
 # Function to read and preprocess documents from a PDF file
-def read_documents_from_pdf(pdf_path):
-    with open(pdf_path, "rb") as pdf_file:
-        doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
-        documents = []
-        for page_num in range(doc.page_count):
-            page = doc[page_num]
-            text = page.get_text()
-            if text.strip():  # Ensure that the page has text
-                documents.append(Document(content=text))
+def read_documents_from_pdf(pdf_file):
+    doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
+    documents = []
+    for page_num in range(doc.page_count):
+        page = doc[page_num]
+        text = page.get_text()
+        if text.strip():  # Ensure that the page has text
+            documents.append(Document(content=text))
     return documents
 
 # Initialize the components and pipeline for RAG
@@ -62,7 +61,7 @@ def initialize_pipeline(documents, model_choice="Anthropic"):
         rag_pipeline.add_component(
             "llm",
             OpenAIChatGenerator(
-                model="gpt-3.5-turbo",
+                model="gpt-3.5-turbo",  # Specify your OpenAI model here
                 api_key=Secret.from_env_var("OPENAI_API_KEY"),
                 streaming_callback=print_streaming_chunk,
             ),
@@ -93,16 +92,23 @@ if os.path.exists(default_pdf_path):
 else:
     st.error("Default PDF not found. Please upload a PDF file.")
 
-# Store conversation history
+# Initialize session state for messages if not already done
 if 'messages' not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = {"Anthropic": [], "OpenAI": []}
+if 'current_model' not in st.session_state:
+    st.session_state.current_model = "Anthropic"
 
 # Model choice selector
 model_choice = st.radio("Select the AI model", options=["Anthropic", "OpenAI"])
 
+# Update the current model in session state if it changes
+if model_choice != st.session_state.current_model:
+    st.session_state.current_model = model_choice
+
 # Automatically load the default PDF if available
 if os.path.exists(default_pdf_path):
-    documents = read_documents_from_pdf(default_pdf_path)
+    with open(default_pdf_path, "rb") as default_pdf:
+        documents = read_documents_from_pdf(default_pdf)
     st.success("Default PDF loaded and processed successfully!")
 else:
     documents = []
@@ -116,16 +122,16 @@ if uploaded_file:
 
 # Initialize pipeline with the extracted documents and selected model
 if documents:
-    rag_pipeline, messages = initialize_pipeline(documents, model_choice=model_choice)
+    rag_pipeline, messages = initialize_pipeline(documents, model_choice=st.session_state.current_model)
 
     # Chat interface
     st.write("## Chat")
-    for message in st.session_state.messages:
+    for message in st.session_state.messages[st.session_state.current_model]:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"], unsafe_allow_html=True)
+            st.markdown(message["content"])
 
     if prompt := st.chat_input("What is your question?"):
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.session_state.messages[st.session_state.current_model].append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
@@ -143,16 +149,20 @@ if documents:
 
                 response_content = result['llm']['replies'][0].content
 
-                # Ensure proper bullet point formatting only if generating new content
-                if "<div" not in response_content:  # Avoid double formatting
-                    response_content = response_content.replace("•", "<li>").replace("\n\n", "<br>")
-                    response_content = f"<div style='margin-left: 20px;'><ul>{response_content}</ul></div>"
+                # Ensure proper bullet point formatting
+                response_content = response_content.replace("•", "\n- ")
 
-                message_placeholder.markdown(response_content, unsafe_allow_html=True)
-                st.session_state.messages.append({"role": "assistant", "content": response_content})
+                # Additional formatting for Streamlit display
+                response_content = "<div style='margin-left: 20px;'><ul>" + ''.join(
+                    [f"<li>{line.strip()}</li>" for line in response_content.split("- ") if line.strip()]
+                ) + "</ul></div>"
+
+                st.markdown(response_content, unsafe_allow_html=True)
+                st.session_state.messages[st.session_state.current_model].append({"role": "assistant", "content": response_content})
 
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
+
 else:
     st.warning("Please upload a PDF file to start the conversation.")
 
