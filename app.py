@@ -62,7 +62,7 @@ def initialize_pipeline(documents, model_choice="Anthropic"):
         rag_pipeline.add_component(
             "llm",
             OpenAIChatGenerator(
-                model="gpt-3.5-turbo",  # Specify your OpenAI model here
+                model="gpt-3.5-turbo",
                 api_key=Secret.from_env_var("OPENAI_API_KEY"),
                 streaming_callback=print_streaming_chunk,
             ),
@@ -122,7 +122,7 @@ if documents:
     st.write("## Chat")
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            st.markdown(message["content"], unsafe_allow_html=True)
 
     if prompt := st.chat_input("What is your question?"):
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -143,16 +143,16 @@ if documents:
 
                 response_content = result['llm']['replies'][0].content
 
-                # Ensure proper HTML bullet point formatting
-                response_content = response_content.replace("•", "<br>&bull; ")
+                # Ensure proper bullet point formatting only if generating new content
+                if "<div" not in response_content:  # Avoid double formatting
+                    response_content = response_content.replace("•", "<li>").replace("\n\n", "<br>")
+                    response_content = f"<div style='margin-left: 20px;'><ul>{response_content}</ul></div>"
 
-                # Display response content in HTML format
-                message_placeholder.markdown(f"<div>{response_content}</div>", unsafe_allow_html=True)
+                message_placeholder.markdown(response_content, unsafe_allow_html=True)
                 st.session_state.messages.append({"role": "assistant", "content": response_content})
 
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
-
 else:
     st.warning("Please upload a PDF file to start the conversation.")
 
