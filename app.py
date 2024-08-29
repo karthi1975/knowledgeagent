@@ -1,8 +1,6 @@
 import os
 import streamlit as st
 import fitz  # PyMuPDF for reading PDFs
-import nltk  # For NLP text processing
-from nltk.tokenize import sent_tokenize
 from haystack import Pipeline, Document  # Correct import for Document
 from haystack.components.builders import ChatPromptBuilder
 from haystack.components.converters import HTMLToDocument
@@ -22,21 +20,6 @@ if not anthropic_api_key and not openai_api_key:
     st.error("API keys for Anthropic and OpenAI are not set in environment variables.")
     st.stop()
 
-# Set the NLTK data path to the existing or create new folder
-nltk_data_path = os.path.join(os.getcwd(), 'nltk_data')
-
-if not os.path.exists(nltk_data_path):
-    os.makedirs(nltk_data_path)
-    nltk.download('punkt', download_dir=nltk_data_path)
-else:
-    nltk.data.path.append(nltk_data_path)
-
-# Check if 'punkt' data is already available; if not, download it to the specified path
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt', download_dir=nltk_data_path)
-
 # Function to read and preprocess documents from a PDF file
 def read_documents_from_pdf(pdf_path):
     with open(pdf_path, "rb") as pdf_file:
@@ -46,9 +29,7 @@ def read_documents_from_pdf(pdf_path):
             page = doc[page_num]
             text = page.get_text()
             if text.strip():  # Ensure that the page has text
-                sentences = sent_tokenize(text)
-                for sentence in sentences:
-                    documents.append(Document(content=sentence))
+                documents.append(Document(content=text))
     return documents
 
 # Initialize the components and pipeline for RAG
