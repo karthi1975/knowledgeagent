@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 import fitz  # PyMuPDF for reading PDFs
-from haystack import Pipeline, Document  # Correct import for Document
+from haystack import Pipeline, Document
 from haystack.components.builders import ChatPromptBuilder
 from haystack.components.converters import HTMLToDocument
 from haystack.components.fetchers import LinkContentFetcher
@@ -143,15 +143,16 @@ if documents:
 
                 response_content = result['llm']['replies'][0].content
 
-                for chunk in response_content.split():
-                    full_response += chunk + " "
-                    time.sleep(0.05)
-                    message_placeholder.markdown(full_response + "▌")
-                message_placeholder.markdown(full_response)
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                # Ensure proper HTML bullet point formatting
+                response_content = response_content.replace("•", "<br>&bull; ")
+
+                # Display response content in HTML format
+                message_placeholder.markdown(f"<div>{response_content}</div>", unsafe_allow_html=True)
+                st.session_state.messages.append({"role": "assistant", "content": response_content})
 
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
+
 else:
     st.warning("Please upload a PDF file to start the conversation.")
 
