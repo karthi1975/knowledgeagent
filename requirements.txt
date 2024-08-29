@@ -1,0 +1,9 @@
+anthropic-haystack
+transformers
+trafilatura
+sentence-transformers
+PyMuPDF
+streamlit
+haystack-ai==2.2.4
+haystack-experimental==0.1.0
+nltk
